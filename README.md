@@ -1,5 +1,5 @@
-# WhiteSpec
-Python implementation of Zivot-Andrews structural-break unit-root test
+# ZAUnitRoot / ZAUnitRootMP
+Python implementation of Zivot-Andrews structural-break unit-root test. Multi-processing version included for large-sample series.
 
 ## References
 Baum, C.F. (2004). ZANDREWS: Stata module to calculate Zivot-Andrews unit root test in presence of structural break," Statistical Software Components S437301, Boston College Department of Economics, revised 2015.
