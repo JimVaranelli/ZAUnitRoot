@@ -1,10 +1,9 @@
 import sys
 import os
+import time
 import numpy as np
 import pandas as pd
 import statsmodels.tsa.stattools as tsa
-import time
-
 import statsmodels.regression.linear_model as lm
 
 class za:
@@ -165,6 +164,7 @@ class za:
         Notes
         -----
         H0 = unit root with a single structural break
+
         Algorithm follows Baum (2004/2015) approximation to original Zivot-Andrews
         method. Rather than performing an autolag regression at each candidate
         break period (as per the original paper), a single autolag regression is
@@ -194,7 +194,7 @@ class za:
             raise ValueError('ZA: trim value must be a float in range [0, 0.333]')
         x = np.asarray(x)
         if x.ndim > 2 or (x.ndim == 2 and x.shape[1] != 1):
-            raise ValueError('ZA: x must be a 1d array or an 2d array with a single column')
+            raise ValueError('ZA: x must be a 1d array or a 2d array with a single column')
         x = np.reshape(x, (-1, 1))
         nobs = x.shape[0]
         if autolag:
@@ -222,7 +222,7 @@ class za:
         # lagged y and dy
         exog[:, basecols - 1] = x[baselags:(nobs - 1), 0]
         exog[:, basecols:] = tsa.lagmat(dy, baselags, trim='none')[baselags:exog.shape[0] + baselags]
-        # Better time trend, t_const @ t_const = 1 for large nobs
+        # better time trend: t_const @ t_const = 1 for large nobs
         t_const = np.arange(1.0, nobs + 2)
         t_const *= np.sqrt(3) / nobs ** (3 / 2)
         # iterate through the time periods
@@ -236,16 +236,18 @@ class za:
                 exog[:, 2] = t_const[(baselags + 2):(nobs + 1)]
                 if regression == 'ct':
                     exog[:cutoff, 3] = 0
-                    exog[cutoff:, 3] = t_const[1:nobs - bp + 1]
+                    exog[cutoff:, 3] = t_const[1:(nobs - bp + 1)]
             else:
-                exog[:, 1] = t_const[baselags + 2: nobs + 1]
-                exog[:cutoff, 2] = 0
-                exog[cutoff:, 2] = t_const[1:nobs - bp + 1]
+                exog[:, 1] = t_const[(baselags + 2):(nobs + 1)]
+                exog[:(cutoff-1), 2] = 0
+                exog[(cutoff-1):, 2] = t_const[0:(nobs - bp + 1)]
             # check exog rank on first iteration
             if bp == start_period + 1:
                 o = lm.OLS(dy[baselags:], exog, hasconst=1).fit()
                 if o.df_model < exog.shape[1] - 1:
-                    raise ValueError('ZA: auxiliary exog matrix is not full rank.')
+                    raise ValueError(
+                        'ZA: auxiliary exog matrix is not full rank.\n  cols (exc intercept) = {}  rank = {}'.format(
+                            exog.shape[1] - 1, o.df_model))
                 stats[bp] = o.tvalues[basecols - 1]
             else:
                 stats[bp] = self.__quick_ols(dy[baselags:], exog)[basecols - 1]
