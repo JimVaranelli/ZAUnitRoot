@@ -279,8 +279,6 @@ class ur_za(object):
         return self.run(x, trim=trim, maxlag=maxlag, regression=regression,
                         autolag=autolag)
 
-za = ur_za()
-za.__doc__ = za.run.__doc__
 
 # rgnp.csv: zastat = -5.57615  pval = 0.00312  lags = 8  break_idx = 20
 # gnpdef.csv: zastat = -4.12155  pval = 0.28024  lags = 5  break_idx = 40
@@ -292,6 +290,7 @@ def main():
     cur_dir = os.path.abspath(os.path.dirname(__file__))
     run_dir = os.path.join(cur_dir, "..\\results\\")
     files = ['rgnp.csv', 'gnpdef.csv', 'stkprc.csv', 'rgnpq.csv', 'rand10000.csv']
+    za = ur_za()
     for file in files:
         print(" test file =", file)
         mdl_file = os.path.join(run_dir, file)
