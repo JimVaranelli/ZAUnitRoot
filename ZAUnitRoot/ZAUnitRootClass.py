@@ -115,13 +115,6 @@ class ur_za(object):
     def __quick_ols(self, endog, exog):
         """
         Minimal implementation of LS estimator for internal use
-        xpxi = np.linalg.inv(exog.T @ exog)
-        xpy = exog.T @ endog
-        nobs, k_exog = exog.shape
-        b = xpxi @ xpy
-        e = endog - exog @ b
-        sigma2 = e.T @ e / (nobs - k_exog)
-        return b / np.sqrt(np.diag(sigma2 * xpxi))
         """
         xpxi = np.linalg.inv(exog.T.dot(exog))
         xpy = exog.T.dot(endog)
