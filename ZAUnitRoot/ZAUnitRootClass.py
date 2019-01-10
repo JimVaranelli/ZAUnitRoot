@@ -5,8 +5,12 @@ import numpy as np
 import pandas as pd
 import statsmodels.tsa.stattools as tsa
 import statsmodels.regression.linear_model as lm
+from numpy.testing import (assert_almost_equal, assert_equal)
 
-class za:
+class ur_za(object):
+    """
+    Class wrapper for Zivot-Andrews structural-break unit-root test
+    """
     def __init__(self):
         """
         Critical values for the three different models specified for the
@@ -89,12 +93,13 @@ class za:
         pvalue : float
             The interpolated p-value
         cvdict : dict
-            Critical values for the test statistic at the 1%, 5%, and 10% levels
+            Critical values for the test statistic at the 1%, 5%, and 10%
+            levels
 
         Notes
         -----
-        The p-values are linear interpolated from the quantiles of the simulated
-        ZA test statistic distribution
+        The p-values are linear interpolated from the quantiles of the
+        simulated ZA test statistic distribution
         """
         table = self.__za_critical_values[model]
         y = table[:, 0]
@@ -103,19 +108,27 @@ class za:
         pvalue = np.interp(stat, x, y) / 100.0
         cv = [1.0, 5.0, 10.0]
         crit_value = np.interp(cv, y, x)
-        cvdict = {"1%" : crit_value[0], "5%" : crit_value[1], "10%" : crit_value[2]}
+        cvdict = {"1%" : crit_value[0], "5%" : crit_value[1],
+                  "10%" : crit_value[2]}
         return pvalue, cvdict
 
     def __quick_ols(self, endog, exog):
         """
         Minimal implementation of LS estimator for internal use
-        """
         xpxi = np.linalg.inv(exog.T @ exog)
         xpy = exog.T @ endog
         nobs, k_exog = exog.shape
         b = xpxi @ xpy
         e = endog - exog @ b
         sigma2 = e.T @ e / (nobs - k_exog)
+        return b / np.sqrt(np.diag(sigma2 * xpxi))
+        """
+        xpxi = np.linalg.inv(exog.T.dot(exog))
+        xpy = exog.T.dot(endog)
+        nobs, k_exog = exog.shape
+        b = xpxi.dot(xpy)
+        e = endog - exog.dot(b)
+        sigma2 = e.T.dot(e) / (nobs - k_exog)
         return b / np.sqrt(np.diag(sigma2 * xpxi))
 
     def run(self, x, trim=0.15, maxlag=None, regression='c', autolag='AIC'):
@@ -155,9 +168,11 @@ class za:
         pvalue : float
             based on MC-derived critical values
         cvdict : dict
-            critical values for the test statistic at the 1%, 5%, and 10% levels
+            critical values for the test statistic at the 1%, 5%, and 10%
+            levels
         bpidx : int
             index of x corresponding to endogenously calculated break period
+            with values in the range [0..nobs-1]
         baselag : int
             number of lags used for period regressions
 
@@ -165,40 +180,45 @@ class za:
         -----
         H0 = unit root with a single structural break
 
-        Algorithm follows Baum (2004/2015) approximation to original Zivot-Andrews
-        method. Rather than performing an autolag regression at each candidate
-        break period (as per the original paper), a single autolag regression is
-        run up-front on the base model (constant + trend with no dummies) to
-        determine the best lag length. This lag length is then used for all
-        subsequent break-period regressions. This results in significant run time
-        reduction but also slightly more pessimistic test statistics than the
-        original Zivot-Andrews method, although no attempt has been made to
-        characterize the size/power tradeoff.
+        Algorithm follows Baum (2004/2015) approximation to original
+        Zivot-Andrews method. Rather than performing an autolag regression at
+        each candidate break period (as per the original paper), a single
+        autolag regression is run up-front on the base model (constant + trend
+        with no dummies) to determine the best lag length. This lag length is
+        then used for all subsequent break-period regressions. This results in
+        significant run time reduction but also slightly more pessimistic test
+        statistics than the original Zivot-Andrews method, although no attempt
+        has been made to characterize the size/power tradeoff.
 
         References
         ----------
-        Baum, C.F. (2004). ZANDREWS: Stata module to calculate Zivot-Andrews unit
-        root test in presence of structural break," Statistical Software Components
-        S437301, Boston College Department of Economics, revised 2015.
+        Baum, C.F. (2004). ZANDREWS: Stata module to calculate Zivot-Andrews
+        unit root test in presence of structural break," Statistical Software
+        Components S437301, Boston College Department of Economics, revised
+        2015.
 
-        Schwert, G.W. (1989). Tests for unit roots: A Monte Carlo investigation.
-        Journal of Business & Economic Statistics, 7: 147-159.
+        Schwert, G.W. (1989). Tests for unit roots: A Monte Carlo
+        investigation. Journal of Business & Economic Statistics, 7: 147-159.
 
-        Zivot, E., and Andrews, D.W.K. (1992). Further evidence on the great crash,
-        the oil-price shock, and the unit-root hypothesis. Journal of Business &
-        Economic Studies, 10: 251-270.
+        Zivot, E., and Andrews, D.W.K. (1992). Further evidence on the great
+        crash, the oil-price shock, and the unit-root hypothesis. Journal of
+        Business & Economic Studies, 10: 251-270.
         """
         if regression not in ['c', 't', 'ct']:
-            raise ValueError('ZA: regression option \'%s\' not understood' % regression)
+            raise ValueError(
+                'ZA: regression option \'%s\' not understood' % regression)
         if not isinstance(trim, float) or trim < 0 or trim > (1. / 3.):
-            raise ValueError('ZA: trim value must be a float in range [0, 0.333]')
+            raise ValueError(
+                'ZA: trim value must be a float in range [0, 0.333]')
         x = np.asarray(x)
         if x.ndim > 2 or (x.ndim == 2 and x.shape[1] != 1):
-            raise ValueError('ZA: x must be a 1d array or a 2d array with a single column')
+            raise ValueError(
+                'ZA: x must be a 1d array or a 2d array with a single column')
         x = np.reshape(x, (-1, 1))
         nobs = x.shape[0]
         if autolag:
-            baselags = tsa.adfuller(x[:, 0], maxlag=maxlag, regression='ct', autolag=autolag)[2]
+            baselags = tsa.adfuller(x[:, 0], maxlag=maxlag, regression='ct',
+                                    autolag=autolag)[2]
         elif maxlag:
             baselags = maxlag
         else:
@@ -210,7 +230,7 @@ class za:
             basecols = 5
         else:
             basecols = 4
-        # first-diff y and standardize for numerical stability in long time series
+        # first-diff y and standardize for numerical stability
         dy = np.diff(x, axis=0)[:, 0]
         dy /= np.sqrt(dy.T.dot(dy))
         x = x / np.sqrt(x.T.dot(x))
@@ -221,7 +241,8 @@ class za:
         exog[:, 0] = c_const
         # lagged y and dy
         exog[:, basecols - 1] = x[baselags:(nobs - 1), 0]
-        exog[:, basecols:] = tsa.lagmat(dy, baselags, trim='none')[baselags:exog.shape[0] + baselags]
+        exog[:, basecols:] = tsa.lagmat(
+            dy, baselags, trim='none')[baselags:exog.shape[0] + baselags]
         # better time trend: t_const @ t_const = 1 for large nobs
         t_const = np.arange(1.0, nobs + 2)
         t_const *= np.sqrt(3) / nobs ** (3 / 2)
@@ -246,7 +267,8 @@ class za:
                 o = lm.OLS(dy[baselags:], exog, hasconst=1).fit()
                 if o.df_model < exog.shape[1] - 1:
                     raise ValueError(
-                        'ZA: auxiliary exog matrix is not full rank.\n  cols (exc intercept) = {}  rank = {}'.format(
+                        'ZA: auxiliary exog matrix is not full rank.\n \
+                        cols (exc intercept) = {}  rank = {}'.format(
                             exog.shape[1] - 1, o.df_model))
                 stats[bp] = o.tvalues[basecols - 1]
             else:
@@ -259,6 +281,13 @@ class za:
         cvdict = crit[1]
         return zastat, pval, cvdict, baselags, bpidx
 
+    def __call__(self, x, trim=0.15, maxlag=None, regression='c',
+                 autolag='AIC'):
+        return self.run(x, trim=trim, maxlag=maxlag, regression=regression,
+                        autolag=autolag)
+
+za = ur_za()
+za.__doc__ = za.run.__doc__
 
 # rgnp.csv: zastat = -5.57615  pval = 0.00312  lags = 8  break_idx = 20
 # gnpdef.csv: zastat = -4.12155  pval = 0.28024  lags = 5  break_idx = 40
@@ -270,22 +299,40 @@ def main():
     cur_dir = os.path.abspath(os.path.dirname(__file__))
     run_dir = os.path.join(cur_dir, "..\\results\\")
     files = ['rgnp.csv', 'gnpdef.csv', 'stkprc.csv', 'rgnpq.csv', 'rand10000.csv']
-    zat = za()
     for file in files:
         print(" test file =", file)
         mdl_file = os.path.join(run_dir, file)
         mdl = np.asarray(pd.read_csv(mdl_file))
         st = time.time()
         if file == 'rgnp.csv':
-            res = zat.run(mdl, maxlag=8, regression='c', autolag=None)
+            res = za(mdl, maxlag=8, regression='c', autolag=None)
+            assert_almost_equal(res[0], -5.57615, decimal=3)
+            assert_almost_equal(res[1], 0.00312, decimal=3)
+            assert_equal(res[4], 20)
         elif file == 'gnpdef.csv':
-            res = zat.run(mdl, maxlag=8, regression='c', autolag='t-stat')
+            res = za(mdl, maxlag=8, regression='c', autolag='t-stat')
+            assert_almost_equal(res[0], -4.12155, decimal=3)
+            assert_almost_equal(res[1], 0.28024, decimal=3)
+            assert_equal(res[3], 5)
+            assert_equal(res[4], 40)
         elif file == 'stkprc.csv':
-            res = zat.run(mdl, maxlag=8, regression='ct', autolag='t-stat')
+            res = za(mdl, maxlag=8, regression='ct', autolag='t-stat')
+            assert_almost_equal(res[0], -5.60689, decimal=3)
+            assert_almost_equal(res[1], 0.00894, decimal=3)
+            assert_equal(res[3], 1)
+            assert_equal(res[4], 65)
         elif file == 'rgnpq.csv':
-            res = zat.run(mdl, maxlag=12, regression='t', autolag='t-stat')
+            res = za(mdl, maxlag=12, regression='t', autolag='t-stat')
+            assert_almost_equal(res[0], -3.02761, decimal=3)
+            assert_almost_equal(res[1], 0.63993, decimal=3)
+            assert_equal(res[3], 12)
+            assert_equal(res[4], 102)
         else:
-            res = zat.run(mdl, regression='c', autolag='t-stat')
+            res = za(mdl, regression='c', autolag='t-stat')
+            assert_almost_equal(res[0], -3.48223, decimal=3)
+            assert_almost_equal(res[1], 0.69111, decimal=3)
+            assert_equal(res[3], 25)
+            assert_equal(res[4], 7071)
         print("  zastat =", "{0:0.5f}".format(res[0]), " pval =", "{0:0.5f}".format(res[1]))
         print("    cvdict =", res[2])
         print("    lags =", res[3], " break_idx =", res[4], " time =",
